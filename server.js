@@ -23,14 +23,14 @@ var MongoStore = require('connect-mongo')(expressSession);
 var mongo = require('mongodb');
 var MongoClient = require('mongodb').MongoClient;
 var assert = require('assert');
-var testedUrl = 'mongodb://your_db_url';
+var testedUrl = 'mongodb://Your_db_uri';
 MongoClient.connect(testedUrl, function(err, db) {
   assert.equal(null, err);
   console.log("Connected correctly to server.");
   db.close();
 });
 
-mongoose.connect('mongodb://your_db_url');
+mongoose.connect('mongodb://Your_db_uri');
 var db = mongoose.connection;
 
 var React = require('react');
@@ -329,4 +329,8 @@ var port = process.env.PORT || 3000;
 app.listen(port,function(){
 	console.log("Listening on: " + port);
 	});
+
+
+
+
 
