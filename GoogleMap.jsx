@@ -1,6 +1,7 @@
  "use strict";
 
 var React = require('react');
+var ReactDOM = require('react-dom');
 
 module.exports = React.createClass({
 	
@@ -33,10 +34,11 @@ module.exports = React.createClass({
 		  width="600"
 		  height="450"
 		  frameBorder="0" 
-		  src={"https://www.google.com/maps/embed/v1/place?key=YOURVERYLONGKEY=" + this.state.locale + "&zoom=17"} allowFullScreen>
+		  src={"https://www.google.com/maps/embed/v1/place?key=YOURAPIKEY=" + this.state.locale + "&zoom=17"} allowFullScreen>
 		</iframe>
     );
   }
 
 });
+
 
