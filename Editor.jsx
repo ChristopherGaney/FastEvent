@@ -17,32 +17,26 @@ var Location = require('./Location');
 var Moment = require('moment');
 var Modal = require('react-modal');
 var DeleteModal = require('./DeleteModal');
-var Link = require('react-router').Link;
+var LeavePageModal = require('./LeavePageModal');
 var browserHistory = require('react-router').browserHistory;
 
-// Here we tell the react-modal module what portion
-// of the app should be hidden when the modal appears.
-
-if(typeof window !== 'undefined') {
-	var appElement = window.document.getElementById('mainContent');
-}
 
  var Editor = React.createClass({
 
 	childContextTypes: {
 		gFormsData: React.PropTypes.func.isRequired,
-		hasChanged: React.PropTypes.func.isRequired
+		hasChanged: React.PropTypes.func.isRequired,
+		saveCheck: React.PropTypes.func.isRequired
 	},
 	getChildContext: function() {
 		return { 
 			gFormsData:  this.getFormData,
-			hasChanged: this.setChange
+			hasChanged: this.setChange,
+			saveCheck: this.leavePage
 		};
 	},
 	getInitialState: function() {
-		return { title: '',
-		mainEvent: {}
-		};
+		return { title: '', mainEvent: {}, FormKey: 1, LocationKey: 1, showMessage: true, unSaved: false };
 	},
 	
 	// Before mounting the component, we need to know
@@ -58,15 +52,11 @@ if(typeof window !== 'undefined') {
 				return this.setState({ title: "Edit Your Event", mainEvent: this.props.mainEvent.mainEvent });
 		}
 	},
-	componentDidMount() {
+	componentDidMount: function() {
 		window.scrollTo(0, 0);
 	},
 	componentWillReceiveProps: function(nextProps) {
-		return this.setState({ mainEvent: nextProps.mainEvent.mainEvent });
-	},
-	setChange: function() {
-		this.refs.child.serveMessage('You Have Unsaved Changes');
-		this.refs.msg.serveMessage('You Have Unsaved Changes');
+			return this.setState({ mainEvent: nextProps.mainEvent.mainEvent });
 	},
 	
 	// getFormData first calls validateForSave in the EventForm component
@@ -107,12 +97,23 @@ if(typeof window !== 'undefined') {
 			return;
 		}	
 	},
+	setChange: function() {
+		if(this.state.showMessage === true) {
+			this.setState({ unSaved: true });
+			this.refs.child.serveMessage('You Have Unsaved Changes');
+			this.refs.msg.serveMessage('You Have Unsaved Changes');
+		}
+		else {
+			this.setState({ showMessage: true });
+		}
+	},
 	saveMessage: function() {
 		this.refs.child.serveMessage('Your Event Has Been Saved');
 		this.refs.msg.serveMessage('Your Event Has Been Saved');
 		setTimeout(this.clearMessage, 4000);
 	},
 	clearMessage: function() {
+		this.setState({ unSaved: false });
 		this.refs.child.serveMessage('');
 		this.refs.msg.serveMessage('');
 	},
@@ -135,19 +136,42 @@ if(typeof window !== 'undefined') {
 		this.props.actions.talkToServer(d);
 	},
 	
-	createNew: function() {
-		this.props.actions.set_mainEvent({ mainEvent: {}});
-		this.clearPage();
-		browserHistory.push('/user/create');
-	},
-	
 	// If the user chooses to create a new event, the page
 	// needs to be cleared and the url changed.
 	
+	createNew: function() {
+		this.props.actions.set_mainEvent({ mainEvent: {} });
+		this.clearPage();
+		browserHistory.push('/user/create');
+	},
 	clearPage: function() {
-		this.setState({title: "Create Your Event", mainEvent: {}});
-		this.refs.child.clearForm();
+		this.setState({ 
+			title: "Create Your Event",
+			mainEvent: {},
+			FormKey: this.state.FormKey + 1,
+			LocationKey: this.state.LocationKey + 1,
+			showMessage: false });
 		this.refs.keep.clearEditor();
+	},
+	
+	// leavePage calls LeavePageModal if user attempts to leave the
+	// page without saving data
+	
+	leavePage: function(dest) {
+		if(this.state.unSaved === true) {
+			this.refs.leavepage.checkToSave(dest, this.shouldLeave);
+		}
+		else {
+			this.refs.toggle.transito(dest);
+		}
+	}, 
+	shouldLeave: function(dest, res) {
+		if(res === true) {
+			this.refs.toggle.transito(dest);
+		}
+		else {
+			return;
+		}
 	},
 	
 	// deleteIt calls checkForDelete in the modal component and passes
@@ -174,6 +198,7 @@ if(typeof window !== 'undefined') {
 	
 	finishDelete: function(id) {
 		this.props.actions.deleteEvent(id);
+		this.props.actions.set_mainEvent({ mainEvent: {} });
 		this.clearPage();
 		browserHistory.push('/user/create');
 	},
@@ -188,28 +213,35 @@ if(typeof window !== 'undefined') {
 		var temp = this.state.mainEvent;
 		temp.isMap = true;
 		this.setState({ mainEvent: temp });
+		this.setChange();
 		this.forceUpdate();
 	},
 	deselectMap: function() {
 		var temp = this.state.mainEvent;
 		temp.isMap = false;
 		this.setState({ mainEvent: temp });
+		this.setChange();
 		this.forceUpdate();
 	},
 	weatherSelected: function() {
 		var temp = this.state.mainEvent;
 		temp.isWeather = true;
 		this.setState({ mainEvent: temp });
+		this.setChange();
 		this.forceUpdate();
 	},
 	deselectWeather: function() {
 		var temp = this.state.mainEvent;
 		temp.isWeather = false;
 		this.setState({ mainEvent: temp });
+		this.setChange();
 		this.forceUpdate();
 	},
 	getLocation: function() {
 		return this.state.mainEvent.eventlocation;
+	},
+	closeDropdown: function() {
+		this.refs.toggle.checkToggle();
 	},
 	
   render: function() {
@@ -218,62 +250,138 @@ if(typeof window !== 'undefined') {
 		id = this.state.mainEvent._id;
 	}
 	
-    return <div className="adj_comps">
+    return <div className="viewer" onClick={this.closeDropdown}>
 				<div className="nav">
 					<DeleteModal ref="modalchild" />
-					<EditorNav toEvents={this.toEvents} createNew={this.createNew} deleteIt={this.deleteIt.bind(this,id)} />
+					<LeavePageModal ref="leavepage" />
+					<EditorNav ref="toggle" toEvents={this.toEvents} createNew={this.createNew} deleteIt={this.deleteIt.bind(this,id)} />
 				</div>
 				<div className="row">
-				   <div className="col-content">
-						<div className="page_title create">
-							<h1>{this.state.title}</h1>
+				   <div className="col-viewcontent">
+						<div className="create">
+							<h2>{this.state.title}</h2>
 						</div>
 					</div>
 				</div>
 				<div className="row">
-				   <div className="col-content">
-						<EventForm ref="child" mainEvent={this.state.mainEvent} eventLocale={this.state.mainEvent.eventlocation} talkToServer={this.props.actions.talkToServer} changeLocale={this.changeLocale} />
-						<TextEditor ref="keep" mainEvent={this.state.mainEvent} />
-						<SaveEdit ref="msg" />
+				   <div className="col-viewcontent">
+						<EventForm key={this.state.FormKey} ref="child" mainEvent={this.state.mainEvent} eventLocale={this.state.mainEvent.eventlocation} talkToServer={this.props.actions.talkToServer} changeLocale={this.changeLocale} />
 					</div>
 				</div>
-				<Location changeLocale={this.changeLocale} eventlocation={this.state.mainEvent.eventlocation} />
-				<EditMap getLocation={this.getLocation} mapSelected={this.mapSelected}
-					deselectMap={this.deselectMap} eventLocale={this.state.mainEvent.eventlocation} isMap={this.state.mainEvent.isMap} />
-				<EditWeather getLocation={this.getLocation} eventLocale={this.state.mainEvent.eventlocation}
-					weatherSelected={this.weatherSelected} deselectWeather={this.deselectWeather} isWeather={this.state.mainEvent.isWeather} />
-				<SetTexting />
+				<div className="row">
+					<div className="col-viewcontent">
+						<TextEditor ref="keep" mainEvent={this.state.mainEvent} />
+						<SaveEdit ref="msg" />
+						<Location key={this.state.LocationKey} changeLocale={this.changeLocale} eventlocation={this.state.mainEvent.eventlocation} />
+					</div>
+				</div>
+				<div className="row">
+					<div className="col-viewcontent">
+						<div className="edit_wrap">
+							<EditMap getLocation={this.getLocation} mapSelected={this.mapSelected}
+								deselectMap={this.deselectMap} eventLocale={this.state.mainEvent.eventlocation} isMap={this.state.mainEvent.isMap} />
+							<EditWeather getLocation={this.getLocation} eventLocale={this.state.mainEvent.eventlocation}
+								weatherSelected={this.weatherSelected} deselectWeather={this.deselectWeather} isWeather={this.state.mainEvent.isWeather} />
+							<SetTexting />
+						</div>
+					</div>
+				</div>
 			</div>
   }
 })
 
 
 var EditorNav = React.createClass({
-	
+	contextTypes: {
+		saveCheck: React.PropTypes.func.isRequired 
+	},
+	getInitialState: function() {
+		return { 
+			isOpen: false,
+			classes: 'hidden'
+	  };
+	},
+	checkToggle: function() {
+		if(this.state.isOpen === true) {
+			this.toggleNav();
+		}
+	},
+	toggleNav: function(e) {
+		if(this.state.isOpen === false) {
+			return this.setState({ isOpen: true, classes: 'dropdown-content' });
+		}
+		else {
+			return this.setState({ isOpen: false, classes: 'hidden' });
+		}
+	},
+	navigate: function(dest) {
+		this.context.saveCheck(dest);
+	},
+	transito: function(par) {
+		if(par === 'view') {
+			browserHistory.push('/user/view');
+		}
+		else if(par === 'delete') {
+			this.props.deleteIt();
+		}
+		else if(par === 'add') {
+			this.props.createNew();
+		}
+		else if(par === 'events') {
+			this.props.toEvents();
+		}
+	},
   render: function() {
     return <div className="row">
 				<div id="view_page" className="col-nav">
+					<div className="sandwich_nav">
+						<a href="javascript:void(0)">
+							<div className="sand_box" onClick={this.toggleNav}>
+								<div className="sand_btn"></div>
+								<div className="sand_btn"></div>
+								<div className="sand_btn"></div>
+							</div>
+						</a>
+						<Dropdown classes={this.state.classes} navigate={this.navigate} />
+					</div>
 					<div className="view_nav">
-						<Link to="/user/view">
-							<button>
-								<p>View Event</p>
-							</button>
-						</Link>
-						<button onClick={this.props.toEvents}>
-							<p>Events</p>
+						<button onClick={this.navigate.bind(null,'view')}>
+							<p>View Event</p>
 						</button>
-						<button onClick={this.props.deleteIt}>
+						<button onClick={this.navigate.bind(null,'delete')}>
 							<p>Delete</p>
 						</button>
-						<button onClick={this.props.createNew}>
+						<button onClick={this.navigate.bind(null,'add')}>
 							<p>Add Event</p>
+						</button>
+						<button onClick={this.navigate.bind(null,'events')}>
+							<p>Events</p>
 						</button>
 					</div>
 				</div>
 			</div>
   }
 })
-		
+
+var Dropdown = React.createClass({
+	
+  render: function() {
+    return <div className={this.props.classes}>
+				<button onClick={this.props.navigate.bind(null,'view')}>
+					<p>View Event</p>
+				</button>
+				<button onClick={this.props.navigate.bind(null,'delete')}>
+					<p>Delete</p>
+				</button>
+				<button onClick={this.props.navigate.bind(null,'add')}>
+					<p>Add Event</p>
+				</button>
+				<button onClick={this.props.navigate.bind(null,'events')}>
+					<p>Events</p>
+				</button>
+			 </div>		
+  }
+})		
 		
 var EventForm = React.createClass({
 	contextTypes: {
@@ -297,18 +405,17 @@ var EventForm = React.createClass({
 	},
 	componentDidMount: function() {
 			var pickerStart = new Pikaday({ field: document.getElementById('pickerstart'),
-												format: 'MMM DD YYYY',
+												format: 'MM DD YYYY',
 												onSelect: function() {
 													this.handleStartdateChange(pickerStart.getDate());	
 												}.bind(this)});
 			var pickerEnd = new Pikaday({ field: document.getElementById('pickerend'),
-												format: 'MMM DD YYYY',
+												format: 'MM DD YYYY',
 												onSelect: function() {
 													this.handleEnddateChange(pickerEnd.getDate());	
 												}.bind(this)});
 	},
 	componentWillReceiveProps: function(nextProps) {
-	console.log('bear' + nextProps.eventLocale);
 		if(this.props.eventLocale !== nextProps.eventLocale) {
 			this.setState({ Eventlocation: nextProps.eventLocale });
 		}	
@@ -360,21 +467,6 @@ var EventForm = React.createClass({
 			}
 		},
 		
-		// Clear the form when the user deletes an event
-		// or chooses to create a new event.
-		
-		clearForm: function() {
-			this.setState({
-				Eventname: '',
-				Eventlocation: '',
-				Startdate: '',
-				Enddate: '',
-				ServerMessage: '',
-				DateMessage: '',
-				EventUrl: ''
-				});
-			this.forceUpdate();
-		},
 		
 		// Store the eventname value when it changes in
 		// the EventInput component.
@@ -421,6 +513,7 @@ var EventForm = React.createClass({
 		handleLocationBlur: function(e) {
 			this.props.changeLocale(this.state.Eventlocation);
 		},
+		
 		// Show validation errors to user when saving data.
 		
 		serveMessage: function(mess) {
@@ -435,44 +528,41 @@ var EventForm = React.createClass({
 					
 					<div className="event_info">
 						<div className="input_meta_1">
-							<div className="input name_event">
+							<div className="name_event">
 								<EventInput type={'eventname'} value={this.state.Eventname} label={'Enter Event Name'} name={'Eventname'} htmlFor={'Eventname'}
 									origValue={this.state.Eventname} isrequired={true} onChange={this.onChangeEventname} setEventUrl={this.setEventUrl} onComponentMounted={this.register}
 									talkToServer={this.props.talkToServer} messageRequired={'Invalid Event Name'} />
 							</div>
-							<div className="url_label">
-								<h4>This is the URL for your public page:</h4>
-							</div>
 							<div className="event_url">
-								<h4>FastEvent.com/{this.state.EventUrl}</h4>
+								<h4 className="url_label">This is the URL for your public page:</h4>
+								<h4 className="url">fastevent.com/{this.state.EventUrl}</h4>
 							</div>
 						</div>
-						
 						<div className="input_meta_2">
-							<div className="input date_event">
-								<label><h5>Add An Event Location</h5></label>
-								<input type="text" value={this.state.Eventlocation}  onBlur={this.handleLocationBlur} onChange={this.handleLocationChange} />
-							</div>
-							<div className="input date_event">
-								<div className="date_inline">
+							<div className="date_event">
+								<div className="date_box">
 									<label><h5>Startdate</h5></label>
-									<input type="text" id="pickerstart" defaultValue={this.state.Startdate} />
-									<div className="date_input">{this.state.DateMessage}</div>
+									<input id="pickerstart" readOnly="true" defaultValue={this.state.Startdate} />
+									<div className="start_message">{this.state.DateMessage}</div>
 								</div>
 								
-								<div className="date_inline">
+								<div className="date_box">
 									<label><h5>Enddate</h5></label>
-									<input type="text" id="pickerend" defaultValue={this.state.Enddate} />
+									<input className="end_input" id="pickerend" readOnly="true" defaultValue={this.state.Enddate} />
 								</div>
 							</div>
 						</div>
 						<div className="input_meta_3">
+							<div className="location_event">
+								<label><h5>Add An Event Location</h5></label>
+								<input value={this.state.Eventlocation}  onBlur={this.handleLocationBlur} onChange={this.handleLocationChange} />
+							</div>
 							<div className="top_save">
-								<button className="save_button" onClick={this.handleSave}>SAVE</button>
+								<button className="save_button" onClick={this.handleSave}>SAVE CHANGES</button>
 							</div>
-							<div className="servermessage">
-								<h2>{this.state.ServerMessage}</h2>
-							</div>
+						</div>
+						<div className="servermessage">
+							<h3>{this.state.ServerMessage}</h3>
 						</div>
 					</div>
 				</form>
@@ -512,7 +602,7 @@ var EventInput = React.createClass({
 		var name = '';
 		if(e.target.nextSibling.textContent != '') {
 			e.target.classList.add('borderline');
-			e.target.nextSibling.classList.remove('hidden');
+			e.target.nextSibling.classList.remove('invisible');
 		}
 		else {
 				
@@ -543,7 +633,7 @@ var EventInput = React.createClass({
 						input.classList.add('error'); // add class error
 						input.nextSibling.textContent = 'Unavailable Name';
 						input.classList.add('borderline');
-						input.nextSibling.classList.remove('hidden');
+						input.nextSibling.classList.remove('invisible');
 						}
 					else {
 						var urlState = input.value.trim().split(' ').join('-');
@@ -559,7 +649,7 @@ var EventInput = React.createClass({
 	
 	handleFocus: function(e) {
 		e.target.classList.remove('borderline');
-		e.target.nextSibling.classList.add('hidden');
+		e.target.nextSibling.classList.add('invisible');
 	},
 	
 	// This function checks for the type of input field, calls its 
@@ -619,10 +709,10 @@ var EventInput = React.createClass({
 		className='formInput' required={this.props.isrequired} onChange={this.handleChange} onBlur={this.handleBlur} onFocus={this.handleFocus} />
 		
 		return (
-				<div className="inputEditor">
+				<div className="input_box">
 					<label htmlFor={this.props.htmlFor}><h5>{this.props.label}</h5></label>
 					{inputField}
-					<div className="error hidden"></div>
+					<div className="error invisible"></div>
 				</div>
 			);
 	}
@@ -648,12 +738,12 @@ var SaveEdit = React.createClass({
 		},
   render: function() {
     return <div className="save_edit">
-				<div className="servermessage">
-					<h2>{this.state.ServerMessage}</h2>
-				</div>
 				<button className="save_button" onClick={this.handleSave}>
 					<p>Save</p>
 				</button>
+				<div className="servermessage">
+					<h3>{this.state.ServerMessage}</h3>
+				</div>
 			</div>
   }
 })
@@ -674,6 +764,9 @@ Editor = connect(
 )(Editor)
 
 module.exports = Editor;
+
+
+
 
 
 
