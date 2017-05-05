@@ -14,13 +14,14 @@
     ]
   },
   "scripts": {
-    "build": "node-sass --include-path scss scss/style.scss public/css/style.css --style nested",
+	  "uglify": "browserify ./public/browser.js | uglifyjs --mangle --compress > ./public/bundle.js",
+    "build": "node-sass --include-path scss scss/style.scss public/css/style.css --output-style compressed",
     "watch-css": "nodemon -e scss -x \"npm run build\"",
-    "translate": "babel ./JSX/PageApp.jsx -o ./public/PageApp.js",
+    "translate": "babel ./JSX/View.jsx -o ./public/View.js",
     "pretranspile": "npm run translate",
-    "transpile": "babel ./JSX/SetTexting.jsx -o ./public/SetTexting.js",
+    "transpile": "babel ./JSX/Wrap.jsx -o ./public/Wrap.js",
     "precompile": "npm run transpile",
-    "compile": "babel ./JSX/View.jsx -o ./public/View.js",
+    "compile": "babel ./JSX/YourEvents.jsx -o ./public/YourEvents.js",
     "watch": "watchify ./public/browser.js -o ./public/bundle.js -v",
     "start": "node server.js",
     "devstart": "npm run watch & nodemon server.js --ignore '/bundle.js'",
@@ -66,5 +67,5 @@
   "bugs": {
     "url": ""
   },
-  "homepage": ""
+  "homepage": "http://fastevent.herokuapp.com/"
 }
