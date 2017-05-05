@@ -14,7 +14,7 @@
     ]
   },
   "scripts": {
-	  "uglify": "browserify ./public/browser.js | uglifyjs --mangle --compress > ./public/bundle.js",
+    "uglify": "browserify ./public/browser.js | uglifyjs --mangle --compress > ./public/bundle.js",
     "build": "node-sass --include-path scss scss/style.scss public/css/style.css --output-style compressed",
     "watch-css": "nodemon -e scss -x \"npm run build\"",
     "translate": "babel ./JSX/View.jsx -o ./public/View.js",
